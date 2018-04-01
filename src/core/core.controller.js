@@ -3,10 +3,11 @@
 var defaults = require('./core.defaults');
 var helpers = require('../helpers/index');
 var Interaction = require('./core.interaction');
+var layouts = require('./core.layouts');
 var platform = require('../platforms/platform');
+var plugins = require('./core.plugins');
 
 module.exports = function(Chart) {
-	var plugins = Chart.plugins;
 
 	// Create a dictionary of chart types, to allow for extension of existing types
 	Chart.types = {};
@@ -46,7 +47,7 @@ module.exports = function(Chart) {
 		var newOptions = chart.options;
 
 		helpers.each(chart.scales, function(scale) {
-			Chart.layoutService.removeBox(chart, scale);
+			layouts.removeBox(chart, scale);
 		});
 
 		newOptions = helpers.configMerge(
@@ -375,6 +376,10 @@ module.exports = function(Chart) {
 
 			updateConfig(me);
 
+			// plugins options references might have change, let's invalidate the cache
+			// https://github.com/chartjs/Chart.js/issues/5111#issuecomment-355934167
+			plugins._invalidate(me);
+
 			if (plugins.notify(me, 'beforeUpdate') === false) {
 				return;
 			}
@@ -435,7 +440,7 @@ module.exports = function(Chart) {
 				return;
 			}
 
-			Chart.layoutService.update(this, this.width, this.height);
+			layouts.update(this, this.width, this.height);
 
 			/**
 			 * Provided for backward compatibility, use `afterLayout` instead.
