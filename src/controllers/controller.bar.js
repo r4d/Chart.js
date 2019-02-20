@@ -5,6 +5,8 @@ var defaults = require('../core/core.defaults');
 var elements = require('../elements/index');
 var helpers = require('../helpers/index');
 
+var resolve = helpers.options.resolve;
+
 defaults._set('bar', {
 	hover: {
 		mode: 'label'
@@ -37,7 +39,7 @@ function computeMinSampleSize(scale, pixels) {
 	var prev, curr, i, ilen;
 
 	for (i = 1, ilen = pixels.length; i < ilen; ++i) {
-		min = Math.min(min, pixels[i] - pixels[i - 1]);
+		min = Math.min(min, Math.abs(pixels[i] - pixels[i - 1]));
 	}
 
 	for (i = 0, ilen = ticks.length; i < ilen; ++i) {
@@ -95,8 +97,8 @@ function computeFlexCategoryTraits(index, ruler, options) {
 
 	if (prev === null) {
 		// first data: its size is double based on the next point or,
-		// if it's also the last data, we use the scale end extremity.
-		prev = curr - (next === null ? ruler.end - curr : next - curr);
+		// if it's also the last data, we use the scale size.
+		prev = curr - (next === null ? ruler.end - ruler.start : next - curr);
 	}
 
 	if (next === null) {
@@ -104,8 +106,8 @@ function computeFlexCategoryTraits(index, ruler, options) {
 		next = curr + curr - prev;
 	}
 
-	start = curr - ((curr - prev) / 2) * percent;
-	size = ((next - prev) / 2) * percent;
+	start = curr - (curr - Math.min(prev, next)) / 2 * percent;
+	size = Math.abs(next - prev) / 2 * percent;
 
 	return {
 		chunk: size / ruler.stackCount,
@@ -171,7 +173,7 @@ module.exports = DatasetController.extend({
 	_updateElementGeometry: function(rectangle, index, reset) {
 		var me = this;
 		var model = rectangle._model;
-		var vscale = me.getValueScale();
+		var vscale = me._getValueScale();
 		var base = vscale.getBasePixel();
 		var horizontal = vscale.isHorizontal();
 		var ruler = me._ruler || me.getRuler();
@@ -187,43 +189,15 @@ module.exports = DatasetController.extend({
 	},
 
 	/**
-	 * @private
-	 */
-	getValueScaleId: function() {
-		return this.getMeta().yAxisID;
-	},
-
-	/**
-	 * @private
-	 */
-	getIndexScaleId: function() {
-		return this.getMeta().xAxisID;
-	},
-
-	/**
-	 * @private
-	 */
-	getValueScale: function() {
-		return this.getScaleForId(this.getValueScaleId());
-	},
-
-	/**
-	 * @private
-	 */
-	getIndexScale: function() {
-		return this.getScaleForId(this.getIndexScaleId());
-	},
-
-	/**
 	 * Returns the stacks based on groups and bar visibility.
-	 * @param {Number} [last] - The dataset index
-	 * @returns {Array} The stack list
+	 * @param {number} [last] - The dataset index
+	 * @returns {string[]} The list of stack IDs
 	 * @private
 	 */
 	_getStacks: function(last) {
 		var me = this;
 		var chart = me.chart;
-		var scale = me.getIndexScale();
+		var scale = me._getIndexScale();
 		var stacked = scale.options.stacked;
 		var ilen = last === undefined ? chart.data.datasets.length : last + 1;
 		var stacks = [];
@@ -252,9 +226,9 @@ module.exports = DatasetController.extend({
 
 	/**
 	 * Returns the stack index for the given dataset based on groups and bar visibility.
-	 * @param {Number} [datasetIndex] - The dataset index
-	 * @param {String} [name] - The stack name to find
-	 * @returns {Number} The stack index
+	 * @param {number} [datasetIndex] - The dataset index
+	 * @param {string} [name] - The stack name to find
+	 * @returns {number} The stack index
 	 * @private
 	 */
 	getStackIndex: function(datasetIndex, name) {
@@ -273,7 +247,7 @@ module.exports = DatasetController.extend({
 	 */
 	getRuler: function() {
 		var me = this;
-		var scale = me.getIndexScale();
+		var scale = me._getIndexScale();
 		var stackCount = me.getStackCount();
 		var datasetIndex = me.index;
 		var isHorizontal = scale.isHorizontal();
@@ -308,10 +282,10 @@ module.exports = DatasetController.extend({
 		var me = this;
 		var chart = me.chart;
 		var meta = me.getMeta();
-		var scale = me.getValueScale();
+		var scale = me._getValueScale();
 		var isHorizontal = scale.isHorizontal();
 		var datasets = chart.data.datasets;
-		var value = scale.getRightValue(datasets[datasetIndex].data[index]);
+		var value = +scale.getRightValue(datasets[datasetIndex].data[index]);
 		var minBarLength = scale.options.minBarLength;
 		var stacked = scale.options.stacked;
 		var stack = meta.stack;
@@ -324,10 +298,10 @@ module.exports = DatasetController.extend({
 
 				if (imeta.bar &&
 					imeta.stack === stack &&
-					imeta.controller.getValueScaleId() === scale.id &&
+					imeta.controller._getValueScaleId() === scale.id &&
 					chart.isDatasetVisible(i)) {
 
-					ivalue = scale.getRightValue(datasets[i].data[index]);
+					ivalue = +scale.getRightValue(datasets[i].data[index]);
 					if ((value < 0 && ivalue < 0) || (value >= 0 && ivalue > 0)) {
 						start += ivalue;
 					}
@@ -337,7 +311,7 @@ module.exports = DatasetController.extend({
 
 		base = scale.getPixelForValue(start);
 		head = scale.getPixelForValue(start + value);
-		size = (head - base) / 2;
+		size = head - base;
 
 		if (minBarLength !== undefined && Math.abs(size) < minBarLength) {
 			size = minBarLength;
@@ -383,7 +357,7 @@ module.exports = DatasetController.extend({
 	draw: function() {
 		var me = this;
 		var chart = me.chart;
-		var scale = me.getValueScale();
+		var scale = me._getValueScale();
 		var rects = me.getMeta().data;
 		var dataset = me.getDataset();
 		var ilen = rects.length;
@@ -410,7 +384,6 @@ module.exports = DatasetController.extend({
 		var dataset = datasets[me.index];
 		var custom = rectangle.custom || {};
 		var options = chart.options.elements.rectangle;
-		var resolve = helpers.options.resolve;
 		var values = {};
 		var i, ilen, key;
 

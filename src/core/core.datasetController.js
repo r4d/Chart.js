@@ -2,6 +2,8 @@
 
 var helpers = require('../helpers/index');
 
+var resolve = helpers.options.resolve;
+
 var arrayEvents = ['push', 'pop', 'shift', 'splice', 'unshift'];
 
 /**
@@ -129,6 +131,34 @@ helpers.extend(DatasetController.prototype, {
 		return this.chart.scales[scaleID];
 	},
 
+	/**
+	 * @private
+	 */
+	_getValueScaleId: function() {
+		return this.getMeta().yAxisID;
+	},
+
+	/**
+	 * @private
+	 */
+	_getIndexScaleId: function() {
+		return this.getMeta().xAxisID;
+	},
+
+	/**
+	 * @private
+	 */
+	_getValueScale: function() {
+		return this.getScaleForId(this._getValueScaleId());
+	},
+
+	/**
+	 * @private
+	 */
+	_getIndexScale: function() {
+		return this.getScaleForId(this._getIndexScaleId());
+	},
+
 	reset: function() {
 		this.update(true);
 	},
@@ -195,7 +225,9 @@ helpers.extend(DatasetController.prototype, {
 				unlistenArrayEvents(me._data, me);
 			}
 
-			listenArrayEvents(data, me);
+			if (data && Object.isExtensible(data)) {
+				listenArrayEvents(data, me);
+			}
 			me._data = data;
 		}
 
@@ -245,9 +277,8 @@ helpers.extend(DatasetController.prototype, {
 		var dataset = this.chart.data.datasets[element._datasetIndex];
 		var index = element._index;
 		var custom = element.custom || {};
-		var valueOrDefault = helpers.valueAtIndexOrDefault;
-		var getHoverColor = helpers.getHoverColor;
 		var model = element._model;
+		var getHoverColor = helpers.getHoverColor;
 
 		element.$previousStyle = {
 			backgroundColor: model.backgroundColor,
@@ -255,9 +286,9 @@ helpers.extend(DatasetController.prototype, {
 			borderWidth: model.borderWidth
 		};
 
-		model.backgroundColor = custom.hoverBackgroundColor ? custom.hoverBackgroundColor : valueOrDefault(dataset.hoverBackgroundColor, index, getHoverColor(model.backgroundColor));
-		model.borderColor = custom.hoverBorderColor ? custom.hoverBorderColor : valueOrDefault(dataset.hoverBorderColor, index, getHoverColor(model.borderColor));
-		model.borderWidth = custom.hoverBorderWidth ? custom.hoverBorderWidth : valueOrDefault(dataset.hoverBorderWidth, index, model.borderWidth);
+		model.backgroundColor = resolve([custom.hoverBackgroundColor, dataset.hoverBackgroundColor, getHoverColor(model.backgroundColor)], undefined, index);
+		model.borderColor = resolve([custom.hoverBorderColor, dataset.hoverBorderColor, getHoverColor(model.borderColor)], undefined, index);
+		model.borderWidth = resolve([custom.hoverBorderWidth, dataset.hoverBorderWidth, model.borderWidth], undefined, index);
 	},
 
 	/**
@@ -290,7 +321,8 @@ helpers.extend(DatasetController.prototype, {
 	 * @private
 	 */
 	onDataPush: function() {
-		this.insertElements(this.getDataset().data.length - 1, arguments.length);
+		var count = arguments.length;
+		this.insertElements(this.getDataset().data.length - count, count);
 	},
 
 	/**

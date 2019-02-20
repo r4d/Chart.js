@@ -14,22 +14,22 @@ defaults._set('global', {
 });
 
 module.exports = {
-	frameDuration: 17,
 	animations: [],
-	dropFrames: 0,
 	request: null,
 
 	/**
 	 * @param {Chart} chart - The chart to animate.
 	 * @param {Chart.Animation} animation - The animation that we will animate.
-	 * @param {Number} duration - The animation duration in ms.
-	 * @param {Boolean} lazy - if true, the chart is not marked as animating to enable more responsive interactions
+	 * @param {number} duration - The animation duration in ms.
+	 * @param {boolean} lazy - if true, the chart is not marked as animating to enable more responsive interactions
 	 */
 	addAnimation: function(chart, animation, duration, lazy) {
 		var animations = this.animations;
 		var i, ilen;
 
 		animation.chart = chart;
+		animation.startTime = Date.now();
+		animation.duration = duration;
 
 		if (!lazy) {
 			chart.animating = true;
@@ -79,19 +79,8 @@ module.exports = {
 	 */
 	startDigest: function() {
 		var me = this;
-		var startTime = Date.now();
-		var framesToDrop = 0;
 
-		if (me.dropFrames > 1) {
-			framesToDrop = Math.floor(me.dropFrames);
-			me.dropFrames = me.dropFrames % 1;
-		}
-
-		me.advance(1 + framesToDrop);
-
-		var endTime = Date.now();
-
-		me.dropFrames += (endTime - startTime) / me.frameDuration;
+		me.advance();
 
 		// Do we have more stuff to animate?
 		if (me.animations.length > 0) {
@@ -102,7 +91,7 @@ module.exports = {
 	/**
 	 * @private
 	 */
-	advance: function(count) {
+	advance: function() {
 		var animations = this.animations;
 		var animation, chart;
 		var i = 0;
@@ -111,7 +100,7 @@ module.exports = {
 			animation = animations[i];
 			chart = animation.chart;
 
-			animation.currentStep = (animation.currentStep || 0) + count;
+			animation.currentStep = Math.floor((Date.now() - animation.startTime) / animation.duration * animation.numSteps);
 			animation.currentStep = Math.min(animation.currentStep, animation.numSteps);
 
 			helpers.callback(animation.render, [chart, animation], chart);

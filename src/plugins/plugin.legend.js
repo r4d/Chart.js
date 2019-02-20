@@ -6,6 +6,7 @@ var helpers = require('../helpers/index');
 var layouts = require('../core/core.layouts');
 
 var noop = helpers.noop;
+var valueOrDefault = helpers.valueOrDefault;
 
 defaults._set('global', {
 	legend: {
@@ -84,13 +85,13 @@ defaults._set('global', {
 
 /**
  * Helper function to get the box width based on the usePointStyle option
- * @param labelopts {Object} the label options on the legend
- * @param fontSize {Number} the label font size
- * @return {Number} width of the color box area
+ * @param {object} labelopts - the label options on the legend
+ * @param {number} fontSize - the label font size
+ * @return {number} width of the color box area
  */
 function getBoxWidth(labelOpts, fontSize) {
-	return labelOpts.usePointStyle ?
-		fontSize * Math.SQRT2 :
+	return labelOpts.usePointStyle && labelOpts.boxWidth > fontSize ?
+		fontSize :
 		labelOpts.boxWidth;
 }
 
@@ -327,7 +328,6 @@ var Legend = Element.extend({
 
 		if (opts.display) {
 			var ctx = me.ctx;
-			var valueOrDefault = helpers.valueOrDefault;
 			var fontColor = valueOrDefault(labelOpts.fontColor, globalDefaults.defaultFontColor);
 			var labelFont = helpers.options._parseFont(labelOpts);
 			var fontSize = labelFont.size;
@@ -369,10 +369,9 @@ var Legend = Element.extend({
 				if (opts.labels && opts.labels.usePointStyle) {
 					// Recalculate x and y for drawPoint() because its expecting
 					// x and y to be center of figure (instead of top left)
-					var radius = fontSize * Math.SQRT2 / 2;
-					var offSet = radius / Math.SQRT2;
-					var centerX = x + offSet;
-					var centerY = y + offSet;
+					var radius = boxWidth * Math.SQRT2 / 2;
+					var centerX = x + boxWidth / 2;
+					var centerY = y + fontSize / 2;
 
 					// Draw pointStyle as legend symbol
 					helpers.canvas.drawPoint(ctx, legendItem.pointStyle, radius, centerX, centerY);
@@ -463,7 +462,7 @@ var Legend = Element.extend({
 	 * Handle an event
 	 * @private
 	 * @param {IEvent} event - The event to handle
-	 * @return {Boolean} true if a change occured
+	 * @return {boolean} true if a change occured
 	 */
 	handleEvent: function(e) {
 		var me = this;
