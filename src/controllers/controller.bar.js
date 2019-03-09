@@ -358,7 +358,7 @@ module.exports = function(Chart) {
 			} else if (xScale.min > 0 && xScale.max > 0) {
 				xScalePoint = xScale.getPixelForValue(xScale.min);
 			} else {
-				xScalePoint = xScale.getPixelForValue(0);
+				xScalePoint = xScale.getPixelForValue(xScale.firstTick != undefined ? xScale.firstTick : 0, rectangle._index, rectangle._datasetIndex);
 			}
 
 			helpers.extend(rectangle, {
@@ -467,13 +467,15 @@ module.exports = function(Chart) {
 			var xScale = this.getScaleForId(meta.xAxisID);
 			var yScale = this.getScaleForId(meta.yAxisID);
 
-			var base = 0;
+			var base = xScale.firstTick != undefined ? xScale.firstTick : 0;
 
 			if (xScale.options.stacked) {
 
 				var value = this.chart.data.datasets[datasetIndex].data[index];
-
-				if (value < 0) {
+				
+				if (value instanceof Date) {
+					base = this.chart.data.datasets[datasetIndex].data[0];
+				} else if (value < 0) {
 					for (var i = 0; i < datasetIndex; i++) {
 						var negDS = this.chart.data.datasets[i];
 						var negDSMeta = this.chart.getDatasetMeta(i);
@@ -491,7 +493,7 @@ module.exports = function(Chart) {
 					}
 				}
 
-				return xScale.getPixelForValue(base);
+				return xScale.getPixelForValue(base, index, datasetIndex);
 			}
 
 			base = xScale.getPixelForValue(xScale.min);
@@ -559,20 +561,28 @@ module.exports = function(Chart) {
 
 				var sumPos = 0,
 					sumNeg = 0;
-
-				for (var i = 0; i < datasetIndex; i++) {
-					var ds = this.chart.data.datasets[i];
-					var dsMeta = this.chart.getDatasetMeta(i);
-					if (dsMeta.bar && dsMeta.xAxisID === xScale.id && this.chart.isDatasetVisible(i)) {
-						if (ds.data[index] < 0) {
-							sumNeg += ds.data[index] || 0;
-						} else {
-							sumPos += ds.data[index] || 0;
+					
+				if (value instanceof Date && index === 0) {
+					// get the coordinates of the second date in the array
+					sumPos = this.getDataset().data[1];
+				} else {
+					for (var i = 0; i < datasetIndex; i++) {
+						var ds = this.chart.data.datasets[i];
+						var dsMeta = this.chart.getDatasetMeta(i);
+						if (dsMeta.bar && dsMeta.xAxisID === xScale.id && this.chart.isDatasetVisible(i)) {
+							if (ds.data[index] < 0) {
+								sumNeg += ds.data[index] || 0;
+							} else {
+								sumPos += ds.data[index] || 0;
+							}
 						}
 					}
 				}
 
-				if (value < 0) {
+				if (value instanceof Date) {
+					return xScale.getPixelForValue(sumPos, index, datasetIndex);
+				}
+				else if (value < 0) {
 					return xScale.getPixelForValue(sumNeg + value);
 				} else {
 					return xScale.getPixelForValue(sumPos + value);
@@ -581,7 +591,7 @@ module.exports = function(Chart) {
 
 			return xScale.getPixelForValue(value);
 		},
-
+		
 		calculateBarY: function (index, datasetIndex) {
 			var meta = this.getMeta();
 			var yScale = this.getScaleForId(meta.yAxisID);
